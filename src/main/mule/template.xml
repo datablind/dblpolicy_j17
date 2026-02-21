@@ -33,7 +33,8 @@
     <!--   If dataBlindApiUri and dataBlindApiKey are blank, the policy gives error when creating DBLConnector. Hence assigning defaults -->
     
 	<zt:config name="DATA_BLIND_Config" doc:name="DATA BLIND Config" doc:id="db83d3cc-6e52-40bb-bbb4-d804660144b0" encryptionKey="{{{dataBlindKey}}}" >
-		<zt:connection apiUri="#[vars.dataBlindApiUri default 'NOURI']" apiKey="#[vars.dataBlindApiKey default 'NOKEY']"/>
+		<zt:connection apiUri="#[vars.dataBlindApiUri default 'NOURI']" apiKey="#[vars.dataBlindApiKey default 'NOKEY']" 
+    proxyHost="#[vars.proxyHost default '']" proxyUsername="#[vars.proxyUsername default '']" proxyPassword="#[vars.proxyPassword default '']" proxyPort="#[if (vars.proxyPort != null and vars.proxyPort != '') vars.proxyPort as Number else 0]"/>
     </zt:config> 
 
     <http-policy:proxy name="{{{policyId}}}-custom-policy">
@@ -41,16 +42,20 @@
           <try>
           
           	<set-variable variableName="logLabel" value="DATABLIND_POLICY 2.0.0: " />
-       		<set-variable variableName="sensitiveFields" value="{{{sensitiveFields}}}" />
+       		  <set-variable variableName="sensitiveFields" value="{{{sensitiveFields}}}" />
             <set-variable variableName="dataBlindApiUri" value="{{{dataBlindApiUri}}}" />
             <set-variable variableName="dataBlindApiKey" value="{{{dataBlindApiKey}}}" />
-       		<set-variable variableName="sensitiveFieldsSpecified" value="{{{sensitiveFieldsSpecified}}}" />
-       		<set-variable variableName="dataBlindKey" value="{{{dataBlindKey}}}" />
-       		<set-variable variableName="eligibleHttpCodes" value="{{{eligibleHttpCodes}}}" />
-       		<set-variable variableName="dataBlindPassphrase" value="{{{dataBlindPassphrase}}}" />
-       		<set-variable variableName="dataBlindToken" value="{{{dataBlindToken}}}" />
-       	
-			<set-variable variableName="dataBlindOAuthScope" value="#[(authentication.properties.claims.scp filter ($ == 'DataBlind-Disabled'))[0] default 'DataBlind-Enabled' ]" /> 
+       		  <set-variable variableName="sensitiveFieldsSpecified" value="{{{sensitiveFieldsSpecified}}}" />
+       		  <set-variable variableName="dataBlindKey" value="{{{dataBlindKey}}}" />
+       		  <set-variable variableName="eligibleHttpCodes" value="{{{eligibleHttpCodes}}}" />
+       		  <set-variable variableName="dataBlindPassphrase" value="{{{dataBlindPassphrase}}}" />
+       		  <set-variable variableName="dataBlindToken" value="{{{dataBlindToken}}}" />
+       		  <set-variable variableName="proxyHost" value="{{{proxyHost}}}" />
+       		  <set-variable variableName="proxyUsername" value="{{{proxyUsername}}}" />
+       		  <set-variable variableName="proxyPassword" value="{{{proxyPassword}}}" />
+       		  <set-variable variableName="proxyPort" value="{{{proxyPort}}}" />
+
+			      <set-variable variableName="dataBlindOAuthScope" value="#[(authentication.properties.claims.scp filter ($ == 'DataBlind-Disabled'))[0] default 'DataBlind-Enabled' ]" /> 
 							
             <http-policy:execute-next/>  
             <logger level="INFO" message="#[ vars.logLabel ++ 'DataBlind Policy Begins after execute-next']" />
@@ -90,7 +95,9 @@
 
                    <choice>
                       <when expression="#[((vars.sensitiveFieldsSpecified as Boolean) == true)]" >   
-                      		<zt:encrypt-json doc:name="Encrypt json" doc:id="2ee9cd3c-ecc5-4bef-b3a9-cbcc76d9428d" config-ref="DATA_BLIND_Config" sensitiveFields="#[write(vars.sensitiveFields, 'application/json')]" sensitiveJson="#[write(message.payload, 'application/json')]" tweak="#[vars.tweak]" passPhrase="#[vars.dataBlindPassphrase]" overRideToken="#[vars.dataBlindToken]" target="dblindOut" />
+                      		<zt:encrypt-json doc:name="Encrypt json" doc:id="2ee9cd3c-ecc5-4bef-b3a9-cbcc76d9428d" config-ref="DATA_BLIND_Config" sensitiveFields="#[write(vars.sensitiveFields, 'application/json')]" tweak="#[vars.tweak]" passPhrase="#[vars.dataBlindPassphrase]" overRideToken="#[vars.dataBlindToken]" target="dblindOut">
+                      			<zt:sensitive-json><![CDATA[#[message.payload]]]></zt:sensitive-json>
+                      		</zt:encrypt-json>
                       </when>
                       <otherwise >
        				        <logger level="INFO" message="[vars.logLabel ++ 'Sensitive Data not specified, using AI to determine sensitive fields']" />
@@ -128,7 +135,7 @@
 					
        				<logger level="INFO" message="#[vars.logLabel ++ 'Datablind Encryption Completed']" />
        			       			
-		           <set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;read(vars.dblindOut,"application/json")]' doc:name="Set Variable" doc:id="98fb6712-8f4b-41d2-8ba5-7df3cab536cc" variableName="jsonpayload"/>
+		           <set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;vars.dblindOut]' doc:name="Set Variable" doc:id="98fb6712-8f4b-41d2-8ba5-7df3cab536cc" variableName="jsonpayload"/>
        				<logger level="INFO" message="#[ vars.logLabel ++ 'After Json conversion']" />
 <!--       				
 					<logger level="INFO" message="#[vars.jsonpayload]" />
